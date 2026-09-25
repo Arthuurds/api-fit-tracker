@@ -1,10 +1,14 @@
 from fastapi import FastAPI, Depends, HTTPException, status
+from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from passlib.context import CryptContext
 from typing import List
 
 from app import models, schemas
 from app.database import engine, get_db
+from app.auth import gerar_hash_senha, verificar_senha, criar_token_acesso
+
+from app.auth import criar_token_acesso, gerar_hash_senha, get_usuario_atual, verificar_senha
 
 models.Base.metadata.create_all(bind=engine)
 
@@ -19,16 +23,36 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 @app.post("/usuarios/", response_model=schemas.UsuarioResponse, status_code=status.HTTP_201_CREATED)
 def criar_usuario(usuario: schemas.UsuarioCreate, db: Session = Depends(get_db)):
     usuario_existente = db.query(models.Usuario).filter(models.Usuario.email == usuario.email).first()
+
     if usuario_existente:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Email já cadastrado.")
 
-    senha_criptografada = pwd_context.hash(usuario.senha)
+    senha_criptografada = gerar_hash_senha(usuario.senha)
+
     novo_usuario = models.Usuario(nome=usuario.nome, email=usuario.email, senha_hash=senha_criptografada)
 
     db.add(novo_usuario)
     db.commit()
     db.refresh(novo_usuario)
     return novo_usuario
+
+@app.post("/login/", response_model=schemas.TokenResponse)
+def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
+    usuario = db.query(models.Usuario).filter(models.Usuario.email == form_data.username).first()
+
+    if not usuario or not verificar_senha(form_data.password, usuario.senha_hash):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Email ou senha inválidos.",
+        )
+
+    
+    access_token = criar_token_acesso(dados={"sub": str(usuario.id)})
+    return {"access_token": access_token, "token_type": "bearer"}
+
+
+
+
 
 @app.post("/exercicios/", response_model=schemas.ExercicioResponse, status_code=status.HTTP_201_CREATED)
 def criar_exercicio(exercicio: schemas.ExercicioCreate, db: Session = Depends(get_db)):
@@ -70,3 +94,8 @@ def registrar_treino(registro: schemas.RegistroCreate, db: Session = Depends(get
 def obter_registros_por_usuario(usuario_id: int, db: Session = Depends(get_db)):
     registros = db.query(models.RegistroExecucao).filter(models.RegistroExecucao.usuario_id == usuario_id).all()
     return registros
+
+@app.get("/usuarios/me", response_model=schemas.UsuarioResponse)
+def obter_usuario_logado(usuario_atual: models.Usuario = Depends(get_usuario_atual)):
+    return usuario_atual
+

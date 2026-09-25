@@ -41,3 +41,7 @@ class RegistroResponse(BaseModel):
 
     class Config:
         from_atributes = True
+
+class TokenResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
