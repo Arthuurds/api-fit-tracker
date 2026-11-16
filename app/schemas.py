@@ -13,7 +13,7 @@ class UsuarioResponse(BaseModel):
     email: str
 
     class Config:
-        from_atributes = True
+        from_attributes = True
 
 class ExercicioCreate(BaseModel):
     nome: str
@@ -23,7 +23,7 @@ class ExercicioResponse(ExercicioCreate):
     id: int
 
     class Config:
-        from_atributes = True
+        from_attributes = True
 
 class RegistroCreate(BaseModel):
     usuario_id: int
@@ -40,7 +40,7 @@ class RegistroResponse(BaseModel):
     data: datetime
 
     class Config:
-        from_atributes = True
+        from_attributes = True
 
 class TokenResponse(BaseModel):
     access_token: str
