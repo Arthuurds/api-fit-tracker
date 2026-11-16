@@ -8,10 +8,12 @@ O usuário se cadastra, faz login e recebe um **token JWT**. A API guarda os exe
 
 - **Cadastro de usuários** com senha armazenada como hash (bcrypt)
 - **Login** com retorno de token JWT (validade de 30 minutos)
-- **Rota protegida** `/usuarios/me`, que retorna os dados do usuário logado
+- **Rotas protegidas**: exercícios e registros só funcionam com o token
 - **Cadastro e listagem de exercícios** (nome e grupo muscular)
-- **Registro de execuções**: carga em kg, número de repetições e data
-- **Histórico de treinos** por usuário
+- **Registro de execuções** sempre no nome do usuário logado (o ID vem do token, não do corpo da requisição)
+- **Histórico de treinos** do próprio usuário, com filtro por exercício
+- **Validação dos dados**: senha com no mínimo 6 caracteres, carga não negativa e repetições maiores que zero
+- **Testes automatizados** com pytest
 - **Documentação automática** com Swagger UI, gerada pelo FastAPI
 
 ## Tecnologias
@@ -23,6 +25,7 @@ O usuário se cadastra, faz login e recebe um **token JWT**. A API guarda os exe
 | Banco de dados | SQLite + SQLAlchemy (ORM) |
 | Validação | Pydantic |
 | Segurança | python-jose (JWT) e passlib/bcrypt (hash de senha) |
+| Testes | pytest + TestClient do FastAPI |
 
 ## Estrutura do projeto
 
@@ -33,6 +36,8 @@ app/
 ├── schemas.py    # Modelos Pydantic de entrada e saída
 ├── database.py   # Conexão com o SQLite e sessão do banco
 └── auth.py       # Hash de senha, geração e validação do JWT
+tests/
+└── test_api.py   # Testes de cadastro, login, rotas protegidas e registros
 ```
 
 ## Modelo de dados
@@ -87,11 +92,13 @@ O banco `fit_tracker.db` é criado automaticamente na primeira execução.
 |---|---|---|
 | POST | `/usuarios/` | Cadastra um usuário |
 | POST | `/login/` | Faz login (form `username` = e-mail, `password`) e retorna o token |
-| GET | `/usuarios/me` | Dados do usuário logado (exige token) |
-| POST | `/exercicios/` | Cadastra um exercício |
-| GET | `/exercicios/` | Lista os exercícios |
-| POST | `/registros` | Registra a execução de um exercício |
-| GET | `/registros/usuarios/{usuario_id}` | Histórico de treinos de um usuário |
+| GET | `/usuarios/me` | Dados do usuário logado 🔒 |
+| POST | `/exercicios/` | Cadastra um exercício 🔒 |
+| GET | `/exercicios/` | Lista os exercícios 🔒 |
+| POST | `/registros` | Registra uma execução para o usuário logado 🔒 |
+| GET | `/registros?exercicio_id=` | Histórico do usuário logado, com filtro opcional 🔒 |
+
+🔒 = exige o cabeçalho `Authorization: Bearer <token>`. No Swagger (`/docs`), use o botão **Authorize**.
 
 ## Exemplo de uso
 
@@ -101,17 +108,31 @@ curl -X POST http://127.0.0.1:8000/usuarios/ \
   -H "Content-Type: application/json" \
   -d '{"nome": "Arthur", "email": "arthur@email.com", "senha": "123456"}'
 
-# Registrar um treino
+# Fazer login e pegar o token
+curl -X POST http://127.0.0.1:8000/login/ \
+  -d "username=arthur@email.com&password=123456"
+
+# Registrar um treino com o token recebido
 curl -X POST http://127.0.0.1:8000/registros \
+  -H "Authorization: Bearer SEU_TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"usuario_id": 1, "exercicio_id": 1, "carga_kg": 60, "repeticoes": 10}'
+  -d '{"exercicio_id": 1, "carga_kg": 60, "repeticoes": 10}'
 ```
 
-## Próximos passos
+## Testes
 
-- Proteger as rotas de exercícios e registros com o token JWT
-- Usar o usuário do token no registro de treino, em vez de enviar `usuario_id`
-- Adicionar testes automatizados com `pytest`
+```bash
+pip install -r requirements-dev.txt
+pytest
+```
+
+## Configuração opcional
+
+| Variável | Para que serve | Padrão |
+|---|---|---|
+| `SECRET_KEY` | Chave de assinatura do JWT | chave de desenvolvimento |
+| `DATABASE_URL` | Endereço do banco | `sqlite:///./fit_tracker.db` |
+| `CORS_ORIGINS` | Sites que podem chamar a API pelo navegador, separados por vírgula | nenhum |
 
 ## Autor
 
