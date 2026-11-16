@@ -1,3 +1,4 @@
+import os
 from datetime import datetime, timedelta
 from passlib.context import CryptContext
 
@@ -12,7 +13,7 @@ from app.database import get_db
 
 
 
-SECRET_KEY = "sua_chave_secreta_aqui"
+SECRET_KEY = os.getenv("SECRET_KEY", "dev-secret-troque-em-producao")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
